@@ -5,8 +5,9 @@ import { Stage, Layer, Rect } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Eraser, Pencil, Trash2 } from "lucide-react";
+import { Eraser, Pencil, Trash2, Wallet, AlertCircle } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletNotReadyError } from "@solana/wallet-adapter-base";
 import { useRouter } from "next/navigation";
 import type Konva from "konva";
 
@@ -32,13 +33,14 @@ const COLORS = [
 const GRID_SIZE = 32;
 
 export default function PixelCanvas() {
-  const { connected } = useWallet();
+  const { connected, wallet, connecting } = useWallet();
   const router = useRouter();
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
   const [tool, setTool] = useState<"draw" | "erase">("draw");
   const [pixels, setPixels] = useState<Record<string, string>>({});
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState(640);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -55,6 +57,53 @@ export default function PixelCanvas() {
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  // Clear wallet error when wallet connects successfully
+  useEffect(() => {
+    if (connected) {
+      setWalletError(null);
+    }
+  }, [connected]);
+
+  // Check if selected wallet is ready
+  useEffect(() => {
+    if (wallet && !connected && !connecting) {
+      // Give a small delay to allow connection to start
+      const timer = setTimeout(() => {
+        if (wallet.readyState !== "Installed" && wallet.readyState !== "Loadable") {
+          setWalletError(
+            `${wallet.adapter.name} is not installed. Please install the ${wallet.adapter.name} extension and refresh the page.`
+          );
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [wallet, connected, connecting]);
+
+  // Listen for wallet errors
+  useEffect(() => {
+    const handleWalletError = (event: Event) => {
+      const customEvent = event as CustomEvent<Error>;
+      const error = customEvent.detail;
+
+      if (error instanceof WalletNotReadyError || error.name === "WalletNotReadyError") {
+        setWalletError("No wallet found. Please install a Solana wallet like Phantom to continue.");
+      } else if (error.name === "WalletConnectionError") {
+        setWalletError("Failed to connect wallet. Please try again.");
+      } else if (error.name === "WalletNotConnectedError") {
+        setWalletError("Wallet disconnected. Please reconnect to continue.");
+      } else {
+        setWalletError("An error occurred with your wallet. Please try again.");
+      }
+    };
+
+    window.addEventListener("walletError", handleWalletError);
+
+    return () => {
+      window.removeEventListener("walletError", handleWalletError);
+    };
   }, []);
 
   const cellSize = canvasSize / GRID_SIZE;
@@ -271,12 +320,54 @@ export default function PixelCanvas() {
 
         <Separator />
 
+        {walletError && (
+          <Card className="border-red-500/50 bg-red-500/10">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-red-500">
+                    Wallet Error
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {walletError}
+                  </p>
+                  <button
+                    onClick={() => setWalletError(null)}
+                    className="text-xs text-red-500 hover:text-red-400 underline mt-1"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!connected && !walletError && (
+          <Card className="border-yellow-500/50 bg-yellow-500/10">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <Wallet className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-yellow-500">
+                    Wallet Not Connected
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Connect your wallet using the button in the header to mint your artwork
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Button
           className="w-full h-12 text-lg font-bold tracking-wider uppercase"
           disabled={!connected || Object.keys(pixels).length === 0}
           onClick={handlePreviewAndMint}
         >
-          Preview & Mint
+          {!connected ? "Connect Wallet to Mint" : "Preview & Mint"}
         </Button>
       </div>
     </div>

@@ -44,9 +44,15 @@ export default function AppWalletProvider({
     [network],
   );
 
+  const onError = React.useCallback((error: Error) => {
+    console.error("Wallet error:", error);
+    // Dispatch custom event that can be caught by components
+    window.dispatchEvent(new CustomEvent("walletError", { detail: error }));
+  }, []);
+
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
+      <WalletProvider wallets={wallets} autoConnect onError={onError}>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

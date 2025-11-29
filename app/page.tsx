@@ -51,7 +51,7 @@ export default function Home() {
         {connected ? (
           <button
             onClick={() => router.push("/create")}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-8 py-2 inline-flex items-center justify-center whitespace-nowrap rounded-none text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 uppercase tracking-widest font-bold"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-8 py-2 inline-flex items-center justify-center whitespace-nowrap rounded-none text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 uppercase tracking-widest font-bold cursor-pointer"
           >
             Draw Now
           </button>

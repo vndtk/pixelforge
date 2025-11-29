@@ -117,7 +117,7 @@ export default function PixelCanvas() {
     const layer = stage.getLayers()[0];
 
     // Hide grid lines temporarily by setting their opacity to 0
-    const gridRects = layer.find((node) => {
+    const gridRects = layer.find((node: Konva.Node) => {
       return node.getAttr("opacity") === 0.5;
     });
 

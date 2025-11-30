@@ -5,7 +5,15 @@ import { Stage, Layer, Rect } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Eraser, Pencil, Trash2, Wallet, AlertCircle } from "lucide-react";
+import {
+  Eraser,
+  Pencil,
+  Trash2,
+  Wallet,
+  AlertCircle,
+  Undo2,
+  Redo2,
+} from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletNotReadyError } from "@solana/wallet-adapter-base";
 import { useRouter } from "next/navigation";
@@ -41,9 +49,12 @@ export default function PixelCanvas() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState(640);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<string, string>[]>([{}]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
+  const hasLoadedFromStorage = useRef(false);
 
   useEffect(() => {
     const updateSize = () => {
@@ -71,9 +82,12 @@ export default function PixelCanvas() {
     if (wallet && !connected && !connecting) {
       // Give a small delay to allow connection to start
       const timer = setTimeout(() => {
-        if (wallet.readyState !== "Installed" && wallet.readyState !== "Loadable") {
+        if (
+          wallet.readyState !== "Installed" &&
+          wallet.readyState !== "Loadable"
+        ) {
           setWalletError(
-            `${wallet.adapter.name} is not installed. Please install the ${wallet.adapter.name} extension and refresh the page.`
+            `${wallet.adapter.name} is not installed. Please install the ${wallet.adapter.name} extension and refresh the page.`,
           );
         }
       }, 100);
@@ -88,8 +102,13 @@ export default function PixelCanvas() {
       const customEvent = event as CustomEvent<Error>;
       const error = customEvent.detail;
 
-      if (error instanceof WalletNotReadyError || error.name === "WalletNotReadyError") {
-        setWalletError("No wallet found. Please install a Solana wallet like Phantom to continue.");
+      if (
+        error instanceof WalletNotReadyError ||
+        error.name === "WalletNotReadyError"
+      ) {
+        setWalletError(
+          "No wallet found. Please install a Solana wallet like Phantom to continue.",
+        );
       } else if (error.name === "WalletConnectionError") {
         setWalletError("Failed to connect wallet. Please try again.");
       } else if (error.name === "WalletNotConnectedError") {
@@ -105,6 +124,50 @@ export default function PixelCanvas() {
       window.removeEventListener("walletError", handleWalletError);
     };
   }, []);
+
+  // Load canvas state from localStorage on mount
+  useEffect(() => {
+    if (hasLoadedFromStorage.current) return;
+
+    try {
+      const savedPixels = localStorage.getItem("pixelforge_pixels");
+      const savedHistory = localStorage.getItem("pixelforge_history");
+      const savedHistoryIndex = localStorage.getItem("pixelforge_historyIndex");
+
+      if (savedPixels) {
+        const parsedPixels = JSON.parse(savedPixels);
+        setPixels(parsedPixels);
+      }
+
+      if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+        setHistory(parsedHistory);
+      }
+
+      if (savedHistoryIndex) {
+        const parsedIndex = JSON.parse(savedHistoryIndex);
+        setHistoryIndex(parsedIndex);
+      }
+
+      hasLoadedFromStorage.current = true;
+    } catch (error) {
+      console.error("Failed to load canvas state from localStorage:", error);
+      hasLoadedFromStorage.current = true;
+    }
+  }, []);
+
+  // Save canvas state to localStorage whenever it changes
+  useEffect(() => {
+    if (!hasLoadedFromStorage.current) return;
+
+    try {
+      localStorage.setItem("pixelforge_pixels", JSON.stringify(pixels));
+      localStorage.setItem("pixelforge_history", JSON.stringify(history));
+      localStorage.setItem("pixelforge_historyIndex", JSON.stringify(historyIndex));
+    } catch (error) {
+      console.error("Failed to save canvas state to localStorage:", error);
+    }
+  }, [pixels, history, historyIndex]);
 
   const cellSize = canvasSize / GRID_SIZE;
 
@@ -133,7 +196,33 @@ export default function PixelCanvas() {
   };
 
   const handleEnd = () => {
+    if (isDrawing) {
+      saveToHistory(pixels);
+    }
     setIsDrawing(false);
+  };
+
+  const saveToHistory = (newPixels: Record<string, string>) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push({ ...newPixels });
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setPixels(history[newIndex]);
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setPixels(history[newIndex]);
+    }
   };
 
   const drawPixel = (x: number, y: number) => {
@@ -155,7 +244,9 @@ export default function PixelCanvas() {
   };
 
   const clearCanvas = () => {
-    setPixels({});
+    const newPixels = {};
+    setPixels(newPixels);
+    saveToHistory(newPixels);
   };
 
   const handlePreviewAndMint = () => {
@@ -283,6 +374,26 @@ export default function PixelCanvas() {
                 Erase
               </Button>
             </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={undo}
+                disabled={historyIndex <= 0}
+              >
+                <Undo2 className="w-4 h-4 mr-2" />
+                Undo
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={redo}
+                disabled={historyIndex >= history.length - 1}
+              >
+                <Redo2 className="w-4 h-4 mr-2" />
+                Redo
+              </Button>
+            </div>
             <Button
               variant="destructive"
               className="w-full"
@@ -294,20 +405,20 @@ export default function PixelCanvas() {
           </div>
 
           <Separator />
-
-          {/* Color Picker */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
               Colors
             </h3>
             <div className="grid grid-cols-8 lg:grid-cols-4 gap-2">
               {COLORS.map((color) => (
-                <button
+                <Button
                   key={color}
+                  variant="outline"
+                  size="icon"
                   onClick={() => setSelectedColor(color)}
-                  className={`w-8 h-8 lg:w-10 lg:h-10 rounded-none transition-transform hover:scale-110 border border-border cursor-pointer ${
+                  className={`w-8 h-8 lg:w-10 lg:h-10 p-0 transition-transform hover:scale-110 ${
                     selectedColor === color
-                      ? "ring-2 ring-primary scale-110"
+                      ? "ring-4 ring-primary scale-110"
                       : ""
                   }`}
                   style={{ backgroundColor: color }}
@@ -329,15 +440,14 @@ export default function PixelCanvas() {
                   <p className="text-sm font-medium text-red-500">
                     Wallet Error
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {walletError}
-                  </p>
-                  <button
+                  <p className="text-xs text-muted-foreground">{walletError}</p>
+                  <Button
+                    variant="link"
                     onClick={() => setWalletError(null)}
-                    className="text-xs text-red-500 hover:text-red-400 underline mt-1"
+                    className="text-xs text-red-500 hover:text-red-400 h-auto p-0 mt-1"
                   >
                     Dismiss
-                  </button>
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -354,7 +464,8 @@ export default function PixelCanvas() {
                     Wallet Not Connected
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Connect your wallet using the button in the header to mint your artwork
+                    Connect your wallet using the button in the header to mint
+                    your artwork
                   </p>
                 </div>
               </div>

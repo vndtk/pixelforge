@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Undo2,
   Redo2,
+  Infinity,
 } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletNotReadyError } from "@solana/wallet-adapter-base";
@@ -51,6 +52,7 @@ export default function PixelCanvas() {
   const [walletError, setWalletError] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, string>[]>([{}]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [nftCount, setNftCount] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -163,11 +165,23 @@ export default function PixelCanvas() {
     try {
       localStorage.setItem("pixelforge_pixels", JSON.stringify(pixels));
       localStorage.setItem("pixelforge_history", JSON.stringify(history));
-      localStorage.setItem("pixelforge_historyIndex", JSON.stringify(historyIndex));
+      localStorage.setItem(
+        "pixelforge_historyIndex",
+        JSON.stringify(historyIndex),
+      );
     } catch (error) {
       console.error("Failed to save canvas state to localStorage:", error);
     }
   }, [pixels, history, historyIndex]);
+
+  // Increment NFT counter continuously
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNftCount((prev) => prev + 1);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const cellSize = canvasSize / GRID_SIZE;
 
@@ -282,8 +296,27 @@ export default function PixelCanvas() {
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start justify-center p-4 w-full max-w-7xl mx-auto">
       {/* Canvas Area */}
-      <div className="w-full overflow-hidden">
-        <div ref={containerRef} className="flex justify-center">
+      <div className="w-full overflow-hidden space-y-0">
+        {/* Canvas Info Header */}
+        <div className="py-2 flex items-center justify-start text-xs font-mono">
+          <div className="flex items-center gap-4">
+            <span className="text-muted-foreground">
+              {GRID_SIZE}×{GRID_SIZE} Grid
+            </span>
+            <span className="text-muted-foreground">|</span>
+            <span className="text-muted-foreground">
+              {GRID_SIZE * GRID_SIZE} pixels
+            </span>
+            <span className="text-muted-foreground">|</span>
+            <span className="text-muted-foreground">Zoom: 100%</span>
+            <span className="text-muted-foreground">
+              <span className="text-rose-400">{nftCount.toLocaleString()}</span>{" "}
+              NFTs minted
+            </span>
+          </div>
+          <div className="flex items-center gap-2"></div>
+        </div>
+        <div ref={containerRef} className="flex justify-start">
           <Stage
             ref={stageRef}
             width={canvasSize}

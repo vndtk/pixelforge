@@ -1,27 +1,22 @@
 /**
  * Metaplex NFT Minting Utilities
  *
- * Handles NFT creation on Solana using Metaplex Token Metadata standard
+ * Handles NFT creation on Solana using Metaplex Core standard
  */
 
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
-import {
-  createNft,
-  verifyCollectionV1,
-} from "@metaplex-foundation/mpl-token-metadata";
+import { mplCore } from "@metaplex-foundation/mpl-core";
+import { createV1 } from "@metaplex-foundation/mpl-core";
 import {
   generateSigner,
   keypairIdentity,
-  percentAmount,
   publicKey,
-  createSignerFromKeypair,
 } from "@metaplex-foundation/umi";
 import { Keypair } from "@solana/web3.js";
 import { base58 } from "@metaplex-foundation/umi/serializers";
 
 /**
- * Initializes Umi instance with Metaplex plugins
+ * Initializes Umi instance with Metaplex Core plugin
  */
 export function createUmiInstance(
   rpcEndpoint: string,
@@ -34,15 +29,15 @@ export function createUmiInstance(
     payerKeypair.secretKey
   );
 
-  // Set up Umi with identity and Metaplex plugin
+  // Set up Umi with identity and Metaplex Core plugin
   umi.use(keypairIdentity(umiKeypair));
-  umi.use(mplTokenMetadata());
+  umi.use(mplCore());
 
   return umi;
 }
 
 /**
- * Mints a new NFT using Metaplex Token Metadata
+ * Mints a new NFT using Metaplex Core
  */
 export async function mintNFT(params: {
   rpcEndpoint: string;
@@ -59,20 +54,17 @@ export async function mintNFT(params: {
     rpcEndpoint,
     payerKeypair,
     name,
-    symbol,
     uri,
     sellerFeeBasisPoints,
     recipientAddress,
     collectionMint,
-    collectionUpdateAuthority,
   } = params;
 
-  console.log("\n=== MINTING NFT WITH METAPLEX ===");
+  console.log("\n=== MINTING NFT WITH METAPLEX CORE ===");
   console.log("RPC Endpoint:", rpcEndpoint);
   console.log("Payer:", payerKeypair.publicKey.toBase58());
   console.log("Recipient:", recipientAddress);
   console.log("Name:", name);
-  console.log("Symbol:", symbol);
   console.log("URI:", uri);
   console.log("Royalty:", sellerFeeBasisPoints / 100 + "%");
   console.log("Collection:", collectionMint || "None");
@@ -80,81 +72,58 @@ export async function mintNFT(params: {
   // Initialize Umi
   const umi = createUmiInstance(rpcEndpoint, payerKeypair);
 
-  // Generate a new mint address
-  const mint = generateSigner(umi);
-  console.log("Generated Mint Address:", mint.publicKey);
+  // Generate a new asset address (Core uses 'asset' instead of 'mint')
+  const asset = generateSigner(umi);
+  console.log("Generated Asset Address:", asset.publicKey);
 
   try {
-    // Create NFT
-    console.log("\n📝 Creating NFT...");
-    const createNftBuilder = createNft(umi, {
-      mint,
+    // Create Core NFT
+    console.log("\n📝 Creating Core NFT...");
+
+    // Build plugins array
+    const plugins: any[] = [
+      {
+        type: "Royalties",
+        basisPoints: sellerFeeBasisPoints,
+        creators: [
+          {
+            address: publicKey(recipientAddress),
+            percentage: 100,
+          },
+        ],
+        ruleSet: { type: "None" },
+      },
+    ];
+
+    // Add collection plugin if collection is specified
+    if (collectionMint) {
+      plugins.push({
+        type: "Collection",
+        collection: publicKey(collectionMint),
+      });
+    }
+
+    const createAssetBuilder = createV1(umi, {
+      asset,
       name,
-      symbol,
       uri,
-      sellerFeeBasisPoints: percentAmount(sellerFeeBasisPoints / 100), // Convert basis points to percentage
-      creators: [
-        {
-          address: publicKey(recipientAddress),
-          verified: false, // Will be verified after transfer
-          share: 100,
-        },
-      ],
-      collection: collectionMint
-        ? {
-            key: publicKey(collectionMint),
-            verified: false, // Will verify separately
-          }
-        : undefined,
-      // Token owner will be the recipient
-      tokenOwner: publicKey(recipientAddress),
+      owner: publicKey(recipientAddress),
+      plugins,
     });
 
     // Send transaction
-    const result = await createNftBuilder.sendAndConfirm(umi, {
+    const result = await createAssetBuilder.sendAndConfirm(umi, {
       confirm: { commitment: "confirmed" },
     });
 
     const signature = base58.deserialize(result.signature)[0];
-    console.log("✅ NFT Created!");
+    console.log("✅ Core NFT Created!");
     console.log("Transaction Signature:", signature);
-    console.log("Mint Address:", mint.publicKey);
-
-    // Verify collection if provided
-    if (collectionMint && collectionUpdateAuthority) {
-      console.log("\n🔐 Verifying collection...");
-
-      try {
-        // Convert collection authority to Umi keypair
-        const authorityKeypair = umi.eddsa.createKeypairFromSecretKey(
-          collectionUpdateAuthority.secretKey
-        );
-        const authoritySigner = createSignerFromKeypair(umi, authorityKeypair);
-
-        // Verify collection
-        const verifyBuilder = verifyCollectionV1(umi, {
-          metadata: publicKey(mint.publicKey),
-          collectionMint: publicKey(collectionMint),
-          authority: authoritySigner,
-        });
-
-        const verifyResult = await verifyBuilder.sendAndConfirm(umi, {
-          confirm: { commitment: "confirmed" },
-        });
-
-        const verifySignature = base58.deserialize(verifyResult.signature)[0];
-        console.log("✅ Collection verified!");
-        console.log("Verification Signature:", verifySignature);
-      } catch (error) {
-        console.warn("⚠️ Collection verification failed:", error);
-        console.warn("NFT created but not verified in collection");
-        // Don't throw - NFT is still created successfully
-      }
-    }
+    console.log("Asset Address:", asset.publicKey);
 
     return {
       success: true,
-      mintAddress: mint.publicKey,
+      mintAddress: asset.publicKey,
       signature,
     };
   } catch (error) {

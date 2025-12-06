@@ -30,8 +30,8 @@ export default function AppWalletProvider({
     () => [
       new SolanaMobileWalletAdapter({
         appIdentity: {
-          name: "PixelForge",
-          uri: typeof window !== "undefined" ? window.location.origin : "https://pixelforge.app",
+          name: "Mintistry",
+          uri: typeof window !== "undefined" ? window.location.origin : "https://mintistry.app",
           icon: "/vercel.svg", // Ensure you have an icon or use a relative path
         },
         authorizationResultCache: createDefaultAuthorizationResultCache(),

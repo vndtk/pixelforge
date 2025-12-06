@@ -214,7 +214,7 @@ export default function PreviewPage() {
         description: prepared.request.creatorMessage,
         imageUrl: imageResult.imageUrl,
         attributes: attributes,
-        externalUrl: "https://pixelforge.app",
+        externalUrl: "https://mintistry.app",
         sellerFeeBasisPoints: 500, // 5% royalty
         creatorAddress: prepared.request.walletAddress,
       };

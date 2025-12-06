@@ -1,8 +1,12 @@
 /**
  * ArDrive Turbo SDK initialization using ArweaveSigner
  *
- * This module loads the Arweave JWK from key.json and creates
- * a Turbo instance for uploading files to Arweave.
+ * Supports both environment variables (production) and local key.json (development).
+ *
+ * Environment variables (priority order):
+ * 1. TURBO_JWK_BASE64 - Base64-encoded JWK string
+ * 2. TURBO_JWK_JSON - Raw JSON string of JWK
+ * 3. Fallback: key.json file in project root (local dev only)
  *
  * IMPORTANT: This is SERVER-SIDE ONLY code.
  * Do not import this in client components.
@@ -12,26 +16,48 @@ import { TurboFactory, ArweaveSigner } from "@ardrive/turbo-sdk";
 import fs from "fs";
 import path from "path";
 
-// Load Arweave JWK from key.json
-const jwkPath = path.join(process.cwd(), "key.json");
+/**
+ * Loads Arweave JWK from environment variables or local file
+ */
+function loadJwk() {
+  // 1. Try Base64-encoded JWK from env (recommended for production)
+  const base64 = process.env.TURBO_JWK_BASE64;
+  if (base64 && base64.length > 0) {
+    console.log("✅ Loading JWK from TURBO_JWK_BASE64 environment variable");
+    const decoded = Buffer.from(base64, "base64").toString("utf8");
+    return JSON.parse(decoded);
+  }
 
-let jwk: any;
-try {
+  // 2. Try JSON JWK from env (alternative for production)
+  const json = process.env.TURBO_JWK_JSON;
+  if (json && json.length > 0) {
+    console.log("✅ Loading JWK from TURBO_JWK_JSON environment variable");
+    return JSON.parse(json);
+  }
+
+  // 3. Fallback: load key.json from local filesystem (for local dev)
+  const jwkPath = path.join(process.cwd(), "key.json");
+
+  if (!fs.existsSync(jwkPath)) {
+    throw new Error(
+      "No Turbo JWK found. Please set TURBO_JWK_BASE64 or TURBO_JWK_JSON " +
+      "environment variable, or place key.json in the project root."
+    );
+  }
+
+  console.log("✅ Loading JWK from key.json (local development)");
   const jwkRaw = fs.readFileSync(jwkPath, "utf8");
-  jwk = JSON.parse(jwkRaw);
-  console.log("✅ Loaded Arweave JWK from key.json");
-} catch (error) {
-  console.error("❌ Failed to load key.json:", error);
-  throw new Error(
-    `Cannot load key.json from ${jwkPath}. Ensure the file exists and is valid JSON.`
-  );
+  return JSON.parse(jwkRaw);
 }
 
-// Create ArweaveSigner
+// Load JWK and create signer
+const jwk = loadJwk();
 const signer = new ArweaveSigner(jwk);
 
 // Initialize Turbo with authenticated signer
 export const turbo = TurboFactory.authenticated({ signer });
+
+console.log("✅ Turbo initialized successfully");
 
 /**
  * Upload data to Arweave via ArDrive Turbo

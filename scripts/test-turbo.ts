@@ -2,7 +2,7 @@
  * Turbo Initialization Test
  *
  * This script verifies that:
- * 1. key.json can be loaded
+ * 1. JWK can be loaded (from env vars or key.json)
  * 2. ArweaveSigner is created successfully
  * 3. Turbo instance is initialized
  * 4. Balance can be fetched (if funded)
@@ -45,7 +45,7 @@ async function main() {
     console.log("\n=== TEST RESULT ===");
     console.log("✅ All checks passed!");
     console.log("✅ Turbo is configured correctly with ArweaveSigner");
-    console.log("✅ key.json loaded successfully");
+    console.log("✅ JWK loaded successfully");
     console.log("\nYou can now use Turbo in your API routes.\n");
 
     process.exit(0);
@@ -54,10 +54,14 @@ async function main() {
     console.error("❌ Error:", error);
 
     if (error instanceof Error) {
-      if (error.message.includes("key.json")) {
-        console.error("\n💡 Make sure key.json exists in the project root:");
-        console.error("   - Download from ArDrive: https://app.ardrive.io");
-        console.error("   - Place at: <project-root>/key.json");
+      if (error.message.includes("No Turbo JWK found")) {
+        console.error("\n💡 Turbo JWK not configured. Choose one option:");
+        console.error("\n   Option 1: Environment Variables (Production/Vercel)");
+        console.error("   - Set TURBO_JWK_BASE64 with base64-encoded JWK");
+        console.error("   - Or set TURBO_JWK_JSON with raw JSON string");
+        console.error("\n   Option 2: Local Development");
+        console.error("   - Download JWK from ArDrive: https://app.ardrive.io");
+        console.error("   - Place as key.json in project root");
         console.error("   - Verify it's valid JSON (Arweave JWK format)");
       }
     }

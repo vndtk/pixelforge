@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
       name: body.name,
       symbol: body.symbol || "FORGE",
       description:
-        body.description || `${body.name} - Pixel art created on PixelForge`,
+        body.description || `${body.name} - Pixel art cards minted on Mintistry.app`,
       image: body.imageUrl,
-      external_url: body.externalUrl || "https://pixelforge.app",
+      external_url: "https://mintistry.app",
       seller_fee_basis_points: body.sellerFeeBasisPoints || 500, // 5% default royalty
       attributes: body.attributes || [],
       properties: {

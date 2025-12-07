@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import type {
   UploadMetadataRequest,
   UploadMetadataResponse,
-} from "@/types/minting";
+} from "@/types/upload";
 import { uploadToTurbo } from "@/lib/turbo";
 
 /**
- * API endpoint to upload NFT metadata to Arweave
+ * API endpoint to upload metadata to Arweave
  *
  * Receives metadata (name, description, image URL, attributes) and uploads
- * a Metaplex-compatible JSON file to Arweave.
+ * a JSON file to Arweave.
  * Returns the permanent metadata URI.
  */
 export async function POST(request: NextRequest) {
@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
     // Build Metaplex-compatible metadata JSON
     const metadata = {
       name: body.name,
-      symbol: body.symbol || "FORGE",
+      symbol: body.symbol || "MINTISTRY",
       description:
-        body.description || `${body.name} - Pixel art cards minted on Mintistry.app`,
+        body.description || `${body.name} - Pixel art created on Mintistry`,
       image: body.imageUrl,
       external_url: "https://mintistry.app",
       seller_fee_basis_points: body.sellerFeeBasisPoints || 500, // 5% default royalty

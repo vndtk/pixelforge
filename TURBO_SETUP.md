@@ -1,6 +1,6 @@
 # ArDrive Turbo Setup with ArweaveSigner
 
-This document explains how PixelForge uses ArDrive Turbo with your existing Arweave wallet (key.json).
+This document explains how Mintistry uses ArDrive Turbo with your existing Arweave wallet (key.json).
 
 ## ✅ Configuration Complete
 
@@ -21,7 +21,7 @@ Your Turbo setup has been migrated to use `ArweaveSigner` with `key.json`.
 ## 📁 File Structure
 
 ```
-pixelforge/
+mintistry/
 ├── key.json                    ← Your Arweave JWK (gitignored)
 ├── lib/
 │   └── turbo.ts               ← Turbo initialization with ArweaveSigner
@@ -176,7 +176,7 @@ ls -la key.json
 cat key.json | jq .
 
 # Ensure it's in project root
-pwd  # Should be /path/to/pixelforge
+pwd  # Should be /path/to/mintistry
 ```
 
 ### Error: "bad secret key size"

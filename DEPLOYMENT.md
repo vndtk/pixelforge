@@ -1,10 +1,10 @@
 # Production Deployment Guide
 
-This guide explains how to deploy PixelForge to production (Vercel) with proper Turbo configuration.
+This guide explains how to deploy Mintistry to production (Vercel) with proper Turbo configuration.
 
 ## Overview
 
-PixelForge uses ArDrive Turbo for uploading images and metadata to Arweave. The setup supports:
+Mintistry uses ArDrive Turbo for uploading images and metadata to Arweave. The setup supports:
 
 - **Local Development**: Uses `key.json` file
 - **Production (Vercel)**: Uses environment variables
@@ -51,7 +51,7 @@ Raw JSON string of your Arweave JWK.
 2. **Place key.json in project root**:
    ```bash
    # Project structure:
-   pixelforge/
+   mintistry/
    ├── key.json          ← Your Arweave JWK
    ├── app/
    ├── lib/
@@ -286,4 +286,4 @@ If you encounter issues:
 3. Test locally with `npx tsx scripts/test-turbo.ts`
 4. Check Turbo balance at https://app.ardrive.io/#/turbo
 
-Your PixelForge app is now ready for production deployment! 🚀
+Your Mintistry app is now ready for production deployment! 🚀

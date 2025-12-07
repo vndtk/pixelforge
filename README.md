@@ -1,10 +1,10 @@
-# PixelForge
+# Mintistry
 
-A pixel art NFT creation and minting platform built on Solana. Create pixel art directly in your browser and mint it as an NFT with permanent decentralized storage.
+A pixel art creation platform with permanent decentralized storage on Arweave. Create pixel art directly in your browser and upload it to Arweave for permanent storage.
 
 ## Overview
 
-PixelForge is a Next.js application that enables users to create pixel art on a 32x32 canvas and mint their creations as NFTs on the Solana blockchain. The application uses Metaplex Core for NFT creation, Arweave for permanent decentralized storage, and integrates with Solana wallet adapters for seamless user experience.
+Mintistry is a Next.js application that enables users to create pixel art on a 32x32 canvas and upload their creations to Arweave for permanent decentralized storage. The application uses ArDrive Turbo for fast, cost-effective uploads to Arweave.
 
 ## Features
 
@@ -15,22 +15,18 @@ PixelForge is a Next.js application that enables users to create pixel art on a 
 - **Undo/Redo** - Full history management for your artwork
 - **Canvas Persistence** - Automatically saves your work to localStorage
 - **Touch Support** - Works on mobile and tablet devices
+- **Clear Canvas** - Reset your artwork with one click
 
-### NFT Minting
-- **Solana Wallet Integration** - Connect via Phantom and other popular Solana wallets
-- **Metaplex Core NFTs** - Modern, efficient NFT standard
-- **Arweave Storage** - Permanent, decentralized image and metadata storage
-- **Real-time Cost Calculator** - See minting costs before you commit
-- **Balance Validation** - Checks your SOL balance before minting
-- **NFT Metadata** - Add custom name and creator message (up to 80 characters)
-- **Royalty Support** - Automatic 5% creator royalty configuration
-- **Preview Before Mint** - Review your NFT details before finalizing
+### Arweave Upload
+- **Permanent Storage** - Upload images and metadata to Arweave via ArDrive Turbo
+- **Metadata Support** - Add custom name (max 32 characters) and description (max 80 characters)
+- **Rarity System** - Automatic rarity tier calculation (Common, Uncommon, Rare, Epic, Legendary) based on pixel usage and color diversity
+- **Preview Before Upload** - Review your artwork details before uploading
+- **Permanent URLs** - Get permanent Arweave URLs for your uploaded content
 
 ### Additional Features
-- **Wallet Error Handling** - Helpful error messages and connection guidance
 - **Responsive Design** - Works on desktop, tablet, and mobile
-- **Network Support** - Configured for Solana Devnet (ready for mainnet)
-- **Transaction Explorer Links** - Direct links to view your minted NFTs
+- **Image Size Display** - See the size of your artwork before uploading
 
 ## Tech Stack
 
@@ -42,15 +38,9 @@ PixelForge is a Next.js application that enables users to create pixel art on a 
 - **React Konva** - Canvas rendering engine
 - **Konva 10** - 2D graphics library
 
-### Blockchain & Web3
-- **@solana/web3.js** - Solana blockchain interaction
-- **@solana/wallet-adapter-react** - Wallet connection management
-- **@metaplex-foundation/mpl-core** - NFT standard implementation
-- **@metaplex-foundation/umi** - Metaplex framework
-
 ### Storage
-- **@ardrive/turbo-sdk** - Arweave upload service
-- **Arweave** - Permanent decentralized storage
+- **@ardrive/turbo-sdk** - ArDrive Turbo SDK for Arweave uploads
+- **ArweaveSigner** - Authentication for Turbo uploads
 
 ### UI Components
 - **Radix UI** - Accessible component primitives (Separator, Slider, Slot)
@@ -62,15 +52,14 @@ PixelForge is a Next.js application that enables users to create pixel art on a 
 
 ### Prerequisites
 - Node.js 20+ installed
-- A Solana wallet (Phantom, Solflare, etc.)
-- SOL tokens (for devnet, use the Solana faucet)
+- Arweave JWK file (`key.json`) for Turbo uploads (see [TURBO_SETUP.md](./TURBO_SETUP.md))
 
 ### Installation
 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd pixelforge
+cd mintistry
 ```
 
 2. Install dependencies:
@@ -78,12 +67,22 @@ cd pixelforge
 npm install
 ```
 
-3. Start the development server:
+3. Set up Arweave Turbo:
+   - Place your Arweave JWK file as `key.json` in the project root
+   - Ensure `key.json` is in `.gitignore`
+   - Test the setup: `npx tsx scripts/test-turbo.ts`
+   - Fund your Turbo wallet at https://app.ardrive.io/#/turbo
+
+4. Configure environment variables (optional for local dev):
+   - See [Environment Variables](#environment-variables) section below
+   - For production, see [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+5. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ### Building for Production
 
@@ -94,85 +93,150 @@ npm start
 
 ## Usage
 
-1. **Connect Your Wallet**
-   - Click the wallet button in the header
-   - Select your Solana wallet (e.g., Phantom)
-   - Approve the connection
-
-2. **Create Your Pixel Art**
+1. **Create Your Pixel Art**
    - Select a color from the palette
    - Click or drag on the canvas to draw
    - Use the eraser tool to remove pixels
    - Use undo/redo to refine your artwork
    - Your work is automatically saved
 
-3. **Preview & Mint**
-   - Click "Preview & Mint" when ready
-   - Add an NFT name (required, max 32 characters)
-   - Optionally add a creator message (max 80 characters)
-   - Review the minting cost
-   - Click "Mint NFT" to create your NFT
+2. **Preview & Upload**
+   - Click "Preview & Upload" when ready
+   - Add a name (required, max 32 characters)
+   - Optionally add a description (max 80 characters)
+   - Click "Upload to Arweave" to upload your artwork
 
-4. **View Your NFT**
-   - After minting, you'll receive a transaction signature
-   - View it on Solana Explorer (devnet)
-   - Your NFT will appear in your wallet
+3. **View Your Upload**
+   - After uploading, you'll receive permanent Arweave URLs
+   - Image URL: Direct link to your PNG image
+   - Metadata URI: Link to your metadata JSON
 
 ## Project Structure
 
 ```
-pixelforge/
+mintistry/
 ├── app/
-│   ├── api/               # API routes for minting operations
-│   ├── create/            # Canvas creation page
-│   ├── preview/           # NFT preview and minting page
-│   ├── layout.tsx         # Root layout with wallet provider
-│   └── page.tsx           # Home page (redirects to canvas)
+│   ├── api/                    # API routes for upload operations
+│   │   ├── upload-image/       # Upload image to Arweave
+│   │   └── upload-metadata/    # Upload metadata to Arweave
+│   ├── create/                 # Canvas creation page
+│   ├── preview/                # Preview and upload page
+│   ├── layout.tsx              # Root layout
+│   └── page.tsx                # Home page (redirects to canvas)
 ├── components/
-│   ├── ui/                # Reusable UI components
+│   ├── ui/                     # Reusable UI components (Radix UI)
 │   │   ├── button.tsx
 │   │   ├── card.tsx
 │   │   ├── separator.tsx
 │   │   └── slider.tsx
-│   ├── AppWalletProvider.tsx
-│   ├── Header.tsx
-│   ├── MintingCostDisplay.tsx
-│   └── PixelCanvas.tsx    # Main canvas component
-├── constants/             # App constants and configuration
-├── hooks/
-│   └── useMintingCost.ts  # Cost calculation hook
+│   ├── Header.tsx              # App header
+│   └── PixelCanvas.tsx         # Main canvas component
 ├── lib/
-│   ├── irys.ts            # Arweave upload utilities
-│   ├── prepare-mint-data.ts
-│   ├── turbo.ts
-│   └── wallet-signature.ts
-└── types/                 # TypeScript type definitions
+│   ├── prepare-upload-data.ts  # Upload data preparation and validation
+│   ├── rarity.ts               # Rarity tier calculation system
+│   ├── turbo.ts                # ArDrive Turbo SDK integration
+│   └── utils.ts                # Utility functions
+├── scripts/
+│   ├── generate-turbo-env.ts   # Generate Turbo env vars
+│   └── test-turbo.ts           # Test Turbo initialization
+└── types/
+    └── upload.ts                # TypeScript type definitions
 ```
+
+## Environment Variables
+
+### Required for Production
+
+```bash
+# ArDrive Turbo (Arweave uploads)
+TURBO_JWK_BASE64=<base64-encoded-arweave-jwk>
+```
+
+### Optional
+
+```bash
+# Alternative Turbo JWK format (not recommended)
+TURBO_JWK_JSON=<raw-json-string>
+```
+
+### Local Development
+
+For local development, place your Arweave JWK as `key.json` in the project root. The app will automatically use it if environment variables are not set.
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
 
 ## Development Notes
 
-### Network Configuration
-The application is currently configured for **Solana Devnet**. To switch to mainnet:
-1. Update network references in API routes
-2. Update wallet adapter configuration
-3. Ensure sufficient SOL for mainnet minting costs
-
 ### Storage Provider
-The app uses **ArDrive Turbo SDK** for uploading images and metadata to Arweave.
+The app uses **ArDrive Turbo SDK** with ArweaveSigner for uploading images and metadata to Arweave. Turbo provides:
+- Fast uploads with prepaid credits
+- Permanent decentralized storage
+- Cost-effective pricing
 
-### Minting Flow
-1. Image uploaded to Arweave (permanent storage)
-2. Metadata JSON uploaded to Arweave
-3. Metaplex Core NFT created on Solana
-4. NFT transferred to user's wallet
+### Upload Flow
+1. User creates pixel art on canvas
+2. User navigates to preview page
+3. Image uploaded to Arweave via Turbo (permanent storage)
+4. Metadata JSON (with rarity attributes) uploaded to Arweave
+5. Permanent URLs returned for both image and metadata
+
+### Rarity System
+Artwork is automatically assigned rarity tiers based on:
+- **Pixel Usage**: Number of filled pixels (0 to canvasSize²)
+- **Color Diversity**: Number of unique colors used (0 to 16)
+
+Quality score calculation: `0.7 * pixelFactor + 0.3 * colorFactor`
+
+Rarity tiers (with probability adjustments):
+- **Common** (60% base, decreases with quality)
+- **Uncommon** (25% base, slight increase)
+- **Rare** (10% base, moderate increase)
+- **Epic** (4% base, significant increase)
+- **Legendary** (1% base, highest increase)
 
 ### Local Storage
 Canvas state is persisted in localStorage:
-- `pixelforge_pixels` - Current pixel data
-- `pixelforge_history` - Undo/redo history
-- `pixelforge_historyIndex` - Current history position
+- `mintistry_pixels` - Current pixel data (coordinate → color mapping)
+- `mintistry_history` - Undo/redo history array
+- `mintistry_historyIndex` - Current history position
 
-Canvas image and pixel data for minting is stored in sessionStorage when navigating to preview.
+Canvas image and pixel data for upload is stored in sessionStorage when navigating to preview:
+- `canvasImage` - Base64 encoded PNG image
+- `canvasPixels` - JSON string of pixel data
+
+## API Routes
+
+### `/api/upload-image`
+Uploads pixel art image to Arweave via Turbo.
+- **Method**: POST
+- **Body**: `{ imageBase64: string, name?: string }`
+- **Returns**: `{ success: boolean, imageUrl?: string, transactionId?: string }`
+
+### `/api/upload-metadata`
+Uploads metadata JSON to Arweave via Turbo.
+- **Method**: POST
+- **Body**: `{ name, symbol, description, imageUrl, attributes, sellerFeeBasisPoints, creatorAddress }`
+- **Returns**: `{ success: boolean, metadataUri?: string, transactionId?: string, metadata?: object }`
+
+## Scripts
+
+### Test Turbo Setup
+```bash
+npx tsx scripts/test-turbo.ts
+```
+Verifies Turbo initialization and displays wallet balance.
+
+### Generate Turbo Environment Variable
+```bash
+npx tsx scripts/generate-turbo-env.ts
+```
+Generates `TURBO_JWK_BASE64` value for production deployment.
+
+## Additional Documentation
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide for Vercel
+- **[TURBO_SETUP.md](./TURBO_SETUP.md)** - Detailed ArDrive Turbo setup instructions
+- **[TESTING_GUIDE.md](./TESTING_GUIDE.md)** - Testing procedures and guidelines
 
 ## License
 

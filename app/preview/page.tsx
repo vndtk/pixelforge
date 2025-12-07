@@ -6,50 +6,33 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft } from "lucide-react";
-import Image from "next/image";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { useMintingCost } from "@/hooks/useMintingCost";
-import { MintingCostDisplay } from "@/components/MintingCostDisplay";
 import {
-  prepareMintData,
+  prepareNFTAttributes,
   getBase64ImageSize,
   formatBytes,
-  prepareNFTAttributes,
-} from "@/lib/prepare-mint-data";
-import { signMintingRequest } from "@/lib/wallet-signature";
+} from "@/lib/prepare-upload-data";
 import type {
-  MintNFTRequest,
-  MintNFTResponse,
   UploadImageRequest,
   UploadImageResponse,
   UploadMetadataRequest,
   UploadMetadataResponse,
-} from "@/types/minting";
-
-const LAMPORTS_PER_SOL = 1_000_000_000;
+} from "@/types/upload";
 
 export default function PreviewPage() {
   const router = useRouter();
-  const wallet = useWallet();
-  const { publicKey, connected } = wallet;
-  const { connection } = useConnection();
 
   const [imageData, setImageData] = useState<string>("");
   const [pixelData, setPixelData] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
-  const [canvasSize, setCanvasSize] = useState(32); // Default to 32x32
-  const [userBalance, setUserBalance] = useState(0);
-  const [isMinting, setIsMinting] = useState(false);
-  const [mintingError, setMintingError] = useState<string | null>(null);
+  const [canvasSize, setCanvasSize] = useState(32);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>("");
-
-  // Use minting cost hook
-  const mintingCost = useMintingCost({
-    nftName: name,
-    creatorMessage: message,
-    canvasSize: canvasSize,
-  });
+  const [uploadedUrls, setUploadedUrls] = useState<{
+    imageUrl?: string;
+    metadataUri?: string;
+  }>({});
 
   useEffect(() => {
     // Load image data from sessionStorage
@@ -67,7 +50,6 @@ export default function PreviewPage() {
       try {
         const parsed = JSON.parse(savedPixels);
         setPixelData(parsed);
-        // You could parse this to determine actual size, for now default to 32
         setCanvasSize(32);
       } catch (error) {
         console.error("Failed to parse pixel data:", error);
@@ -75,102 +57,24 @@ export default function PreviewPage() {
     }
   }, [router]);
 
-  // Fetch user balance
-  useEffect(() => {
-    if (!publicKey || !connected) {
-      setUserBalance(0);
+  const handleUpload = async () => {
+    if (!name.trim()) {
+      setUploadError("Please enter a name");
       return;
     }
 
-    const fetchBalance = async () => {
-      try {
-        const balance = await connection.getBalance(publicKey);
-        setUserBalance(balance / LAMPORTS_PER_SOL);
-      } catch (error) {
-        console.error("Failed to fetch balance:", error);
-        setUserBalance(0);
-      }
-    };
-
-    fetchBalance();
-
-    // Refresh balance every 30 seconds
-    const interval = setInterval(fetchBalance, 30000);
-    return () => clearInterval(interval);
-  }, [publicKey, connected, connection]);
-
-  const handleMint = async () => {
-    if (!publicKey || !connected) {
-      setMintingError("Please connect your wallet to mint");
-      return;
-    }
-
-    setIsMinting(true);
-    setMintingError(null);
+    setIsUploading(true);
+    setUploadError(null);
     setUploadStatus("Preparing data...");
 
     try {
-      // Prepare minting data
-      const prepared = prepareMintData({
-        name,
-        creatorMessage: message,
-        imageData,
-        pixelData,
-        canvasSize,
-        walletAddress: publicKey.toBase58(),
-        network: "devnet", // Change to "mainnet-beta" when ready
-      });
-
-      // Validate data
-      if (!prepared.isValid) {
-        setMintingError(prepared.validationErrors.join(", "));
-        setIsMinting(false);
-        return;
-      }
-
-      // Log prepared data for debugging
-      console.log("=== MINTING REQUEST PREPARED ===");
-      console.log("Wallet Address:", prepared.request.walletAddress);
-      console.log("NFT Name:", prepared.request.name);
-      console.log("Symbol:", prepared.request.symbol);
-      console.log(
-        "Creator Message:",
-        prepared.request.creatorMessage || "None",
-      );
-      console.log("Canvas Size:", prepared.request.canvasSize);
-      console.log(
-        "Pixel Count:",
-        Object.keys(prepared.request.pixelData).length,
-      );
-      console.log(
-        "Image Size:",
-        formatBytes(getBase64ImageSize(prepared.request.imageBase64)),
-      );
-      console.log(
-        "Image Data (first 100 chars):",
-        prepared.request.imageBase64.substring(0, 100) + "...",
-      );
-      console.log("Network:", prepared.request.network);
-
-      // Optional: Sign the request for backend verification
-      const signatureData = await signMintingRequest(wallet, name);
-      if (signatureData) {
-        prepared.request.signature = signatureData.signature;
-        console.log("Request Signature:", signatureData.signature);
-        console.log("Signature Timestamp:", signatureData.timestamp);
-      } else {
-        console.log(
-          "Note: Signature creation skipped (wallet may not support signMessage)",
-        );
-      }
-
+      // Step 1: Upload image to Arweave
       console.log("\n=== STEP 1: UPLOADING IMAGE TO ARWEAVE ===");
       setUploadStatus("Uploading image to Arweave...");
 
-      // Step 1: Upload image to Arweave
       const imageUploadRequest: UploadImageRequest = {
-        imageBase64: prepared.request.imageBase64,
-        name: `${prepared.request.name}.png`,
+        imageBase64: imageData,
+        name: `${name}.png`,
       };
 
       const imageResponse = await fetch("/api/upload-image", {
@@ -185,7 +89,7 @@ export default function PreviewPage() {
       console.log(JSON.stringify(imageResult, null, 2));
 
       if (!imageResult.success || !imageResult.imageUrl) {
-        setMintingError(
+        setUploadError(
           imageResult.error || "Failed to upload image to Arweave",
         );
         console.error("❌ Image upload failed:", imageResult.error);
@@ -201,22 +105,21 @@ export default function PreviewPage() {
 
       // Prepare NFT attributes with rarity calculation
       const attributes = prepareNFTAttributes(
-        prepared.request.pixelData,
-        prepared.request.canvasSize,
-        prepared.request.creatorMessage
+        pixelData,
+        canvasSize,
+        message
       );
 
-      console.log("✨ NFT Attributes (with rarity):", attributes);
+      console.log("✨ Attributes (with rarity):", attributes);
 
       const metadataUploadRequest: UploadMetadataRequest = {
-        name: prepared.request.name,
-        symbol: prepared.request.symbol || "FORGE",
-        description: prepared.request.creatorMessage,
+        name: name,
+        symbol: "MINTISTRY",
+        description: message || `${name} - Pixel art created on Mintistry`,
         imageUrl: imageResult.imageUrl,
         attributes: attributes,
         externalUrl: "https://mintistry.app",
-        sellerFeeBasisPoints: 500, // 5% royalty
-        creatorAddress: prepared.request.walletAddress,
+        sellerFeeBasisPoints: 500,
       };
 
       const metadataResponse = await fetch("/api/upload-metadata", {
@@ -232,7 +135,7 @@ export default function PreviewPage() {
       console.log(JSON.stringify(metadataResult, null, 2));
 
       if (!metadataResult.success || !metadataResult.metadataUri) {
-        setMintingError(
+        setUploadError(
           metadataResult.error || "Failed to upload metadata to Arweave",
         );
         console.error("❌ Metadata upload failed:", metadataResult.error);
@@ -242,65 +145,21 @@ export default function PreviewPage() {
       console.log("✅ Metadata uploaded successfully!");
       console.log("Metadata URI:", metadataResult.metadataUri);
 
-      // Step 3: Mint NFT on Solana
-      console.log("\n=== STEP 3: MINTING NFT ON SOLANA ===");
-      setUploadStatus("Minting NFT on Solana...");
-
-      const mintRequest = {
+      setUploadedUrls({
+        imageUrl: imageResult.imageUrl,
         metadataUri: metadataResult.metadataUri,
-        name: prepared.request.name,
-        symbol: prepared.request.symbol || "FORGE",
-        sellerFeeBasisPoints: 500, // 5% royalty
-        recipientAddress: prepared.request.walletAddress,
-      };
-
-      const mintResponse = await fetch("/api/mint-nft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mintRequest),
       });
-
-      const mintResult = await mintResponse.json();
-
-      console.log("\n=== MINT RESPONSE ===");
-      console.log(JSON.stringify(mintResult, null, 2));
-
-      if (!mintResult.success) {
-        setMintingError(mintResult.error || "Failed to mint NFT");
-        console.error("❌ Minting failed:", mintResult.error);
-        return;
-      }
-
-      console.log("\n🎉 NFT MINTED SUCCESSFULLY!");
-      console.log("Transaction:", mintResult.signature);
-      console.log("Mint Address:", mintResult.mintAddress);
-      console.log("Image URL:", imageResult.imageUrl);
-      console.log("Metadata URI:", metadataResult.metadataUri);
-
-      const explorerUrl = `https://explorer.solana.com/tx/${mintResult.signature}?cluster=devnet`;
-
-      alert(
-        `🎉 NFT Minted Successfully!\n\n` +
-          `Name: ${prepared.request.name}\n` +
-          `Mint Address: ${mintResult.mintAddress}\n\n` +
-          `Transaction: ${mintResult.signature}\n\n` +
-          `View on Explorer:\n${explorerUrl}`,
-      );
-
-      // TODO: Redirect to success page or show NFT
-      // router.push(`/success?mint=${mintResult.mintAddress}`);
 
       setUploadStatus("Complete! ✅");
     } catch (error) {
-      console.error("Error preparing minting data:", error);
-      setMintingError(
+      console.error("Error uploading:", error);
+      setUploadError(
         error instanceof Error
           ? error.message
-          : "Failed to prepare minting data",
+          : "Failed to upload files",
       );
     } finally {
-      setIsMinting(false);
-      setUploadStatus("");
+      setIsUploading(false);
     }
   };
 
@@ -341,7 +200,7 @@ export default function PreviewPage() {
 
         {/* Form */}
         <div className="flex flex-col gap-4">
-          <h2 className="text-2xl font-bold text-primary">NFT Details</h2>
+          <h2 className="text-2xl font-bold text-primary">Upload Details</h2>
 
           <Card className="rounded-none">
             <CardContent className="pt-6 space-y-6">
@@ -359,7 +218,7 @@ export default function PreviewPage() {
                   maxLength={32}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter NFT name"
+                  placeholder="Enter name"
                   className="w-full h-10 px-4 py-2 bg-background border border-border rounded-none text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   required
                 />
@@ -370,20 +229,20 @@ export default function PreviewPage() {
 
               <Separator />
 
-              {/* Message/Inscription */}
+              {/* Message/Description */}
               <div className="space-y-2">
                 <label
                   htmlFor="message"
                   className="text-sm font-medium text-muted-foreground uppercase tracking-wider"
                 >
-                  Creator Message (Optional)
+                  Description (Optional)
                 </label>
                 <textarea
                   id="message"
                   maxLength={80}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Add a message or inscription..."
+                  placeholder="Add a description..."
                   rows={3}
                   className="w-full px-4 py-2 bg-background border border-border rounded-none text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none"
                 />
@@ -394,60 +253,89 @@ export default function PreviewPage() {
 
               <Separator />
 
-              {/* Minting Cost Display */}
-              {connected ? (
-                <MintingCostDisplay
-                  cost={mintingCost}
-                  userBalance={userBalance}
-                />
-              ) : (
-                <Card className="border-yellow-500/50 bg-yellow-500/10">
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-yellow-500">
-                      Connect your wallet to see minting cost
-                    </p>
-                  </CardContent>
-                </Card>
+              {/* Image Size Info */}
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Image Size:</span>
+                  <span className="font-medium">
+                    {formatBytes(getBase64ImageSize(imageData))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Pixels Used:</span>
+                  <span className="font-medium">
+                    {Object.keys(pixelData).length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Success Display */}
+              {uploadedUrls.imageUrl && uploadedUrls.metadataUri && (
+                <>
+                  <Separator />
+                  <Card className="border-green-500/50 bg-green-500/10">
+                    <CardContent className="pt-4">
+                      <p className="text-sm font-medium text-green-500 mb-2">
+                        ✅ Upload Successful!
+                      </p>
+                      <div className="space-y-1 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Image: </span>
+                          <a
+                            href={uploadedUrls.imageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline break-all"
+                          >
+                            {uploadedUrls.imageUrl}
+                          </a>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Metadata:{" "}
+                          </span>
+                          <a
+                            href={uploadedUrls.metadataUri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline break-all"
+                          >
+                            {uploadedUrls.metadataUri}
+                          </a>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
               )}
 
               {/* Error Display */}
-              {mintingError && (
+              {uploadError && (
                 <Card className="border-red-500/50 bg-red-500/10">
                   <CardContent className="pt-4">
-                    <p className="text-sm text-red-500">{mintingError}</p>
+                    <p className="text-sm text-red-500">{uploadError}</p>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Mint Button */}
+              {/* Upload Button */}
               <Button
                 className="w-full h-12 text-lg font-bold tracking-wider uppercase"
                 disabled={
                   !name.trim() ||
-                  !connected ||
-                  isMinting ||
-                  mintingCost.isLoading ||
-                  userBalance < mintingCost.total ||
+                  isUploading ||
                   Object.keys(pixelData).length === 0
                 }
-                onClick={handleMint}
+                onClick={handleUpload}
                 title={
-                  !connected
-                    ? "Connect wallet to mint"
-                    : userBalance < mintingCost.total
-                      ? "Insufficient SOL balance"
-                      : Object.keys(pixelData).length === 0
-                        ? "Canvas is empty"
-                        : ""
+                  Object.keys(pixelData).length === 0
+                    ? "Canvas is empty"
+                    : ""
                 }
               >
-                {!connected
-                  ? "Connect Wallet to Mint"
-                  : isMinting
-                    ? uploadStatus || "Processing..."
-                    : mintingCost.isLoading
-                      ? "Calculating cost..."
-                      : "Mint NFT"}
+                {isUploading
+                  ? uploadStatus || "Uploading..."
+                  : "Upload to Arweave"}
               </Button>
             </CardContent>
           </Card>

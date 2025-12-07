@@ -70,7 +70,7 @@ export async function uploadToTurbo(
   // Add content type tag
   const allTags = [
     { name: "Content-Type", value: contentType },
-    { name: "App-Name", value: "PixelForge" },
+    { name: "App-Name", value: "Mintistry" },
     ...tags,
   ];
 

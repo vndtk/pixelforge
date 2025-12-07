@@ -9,14 +9,9 @@ import {
   Eraser,
   Pencil,
   Trash2,
-  Wallet,
-  AlertCircle,
   Undo2,
   Redo2,
-  Infinity,
 } from "lucide-react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletNotReadyError } from "@solana/wallet-adapter-base";
 import { useRouter } from "next/navigation";
 import type Konva from "konva";
 
@@ -42,17 +37,14 @@ const COLORS = [
 const GRID_SIZE = 32;
 
 export default function PixelCanvas() {
-  const { connected, wallet, connecting } = useWallet();
   const router = useRouter();
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
   const [tool, setTool] = useState<"draw" | "erase">("draw");
   const [pixels, setPixels] = useState<Record<string, string>>({});
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState(640);
-  const [walletError, setWalletError] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, string>[]>([{}]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [nftCount, setNftCount] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -72,69 +64,14 @@ export default function PixelCanvas() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Clear wallet error when wallet connects successfully
-  useEffect(() => {
-    if (connected) {
-      setWalletError(null);
-    }
-  }, [connected]);
-
-  // Check if selected wallet is ready
-  useEffect(() => {
-    if (wallet && !connected && !connecting) {
-      // Give a small delay to allow connection to start
-      const timer = setTimeout(() => {
-        if (
-          wallet.readyState !== "Installed" &&
-          wallet.readyState !== "Loadable"
-        ) {
-          setWalletError(
-            `${wallet.adapter.name} is not installed. Please install the ${wallet.adapter.name} extension and refresh the page.`,
-          );
-        }
-      }, 100);
-
-      return () => clearTimeout(timer);
-    }
-  }, [wallet, connected, connecting]);
-
-  // Listen for wallet errors
-  useEffect(() => {
-    const handleWalletError = (event: Event) => {
-      const customEvent = event as CustomEvent<Error>;
-      const error = customEvent.detail;
-
-      if (
-        error instanceof WalletNotReadyError ||
-        error.name === "WalletNotReadyError"
-      ) {
-        setWalletError(
-          "No wallet found. Please install a Solana wallet like Phantom to continue.",
-        );
-      } else if (error.name === "WalletConnectionError") {
-        setWalletError("Failed to connect wallet. Please try again.");
-      } else if (error.name === "WalletNotConnectedError") {
-        setWalletError("Wallet disconnected. Please reconnect to continue.");
-      } else {
-        setWalletError("An error occurred with your wallet. Please try again.");
-      }
-    };
-
-    window.addEventListener("walletError", handleWalletError);
-
-    return () => {
-      window.removeEventListener("walletError", handleWalletError);
-    };
-  }, []);
-
   // Load canvas state from localStorage on mount
   useEffect(() => {
     if (hasLoadedFromStorage.current) return;
 
     try {
-      const savedPixels = localStorage.getItem("pixelforge_pixels");
-      const savedHistory = localStorage.getItem("pixelforge_history");
-      const savedHistoryIndex = localStorage.getItem("pixelforge_historyIndex");
+      const savedPixels = localStorage.getItem("mintistry_pixels");
+      const savedHistory = localStorage.getItem("mintistry_history");
+      const savedHistoryIndex = localStorage.getItem("mintistry_historyIndex");
 
       if (savedPixels) {
         const parsedPixels = JSON.parse(savedPixels);
@@ -163,10 +100,10 @@ export default function PixelCanvas() {
     if (!hasLoadedFromStorage.current) return;
 
     try {
-      localStorage.setItem("pixelforge_pixels", JSON.stringify(pixels));
-      localStorage.setItem("pixelforge_history", JSON.stringify(history));
+      localStorage.setItem("mintistry_pixels", JSON.stringify(pixels));
+      localStorage.setItem("mintistry_history", JSON.stringify(history));
       localStorage.setItem(
-        "pixelforge_historyIndex",
+        "mintistry_historyIndex",
         JSON.stringify(historyIndex),
       );
     } catch (error) {
@@ -174,14 +111,6 @@ export default function PixelCanvas() {
     }
   }, [pixels, history, historyIndex]);
 
-  // Increment NFT counter continuously
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNftCount((prev) => prev + 1);
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const cellSize = canvasSize / GRID_SIZE;
 
@@ -263,7 +192,7 @@ export default function PixelCanvas() {
     saveToHistory(newPixels);
   };
 
-  const handlePreviewAndMint = () => {
+  const handlePreviewAndUpload = () => {
     if (!stageRef.current) return;
 
     // Create a temporary stage for export without grid lines
@@ -309,10 +238,6 @@ export default function PixelCanvas() {
             </span>
             <span className="text-muted-foreground">|</span>
             <span className="text-muted-foreground">Zoom: 100%</span>
-            <span className="text-muted-foreground">
-              <span className="text-rose-400">{nftCount.toLocaleString()}</span>{" "}
-              NFTs minted
-            </span>
           </div>
           <div className="flex items-center gap-2"></div>
         </div>
@@ -462,56 +387,12 @@ export default function PixelCanvas() {
           </div>
         </div>
 
-        <Separator />
-
-        {walletError && (
-          <Card className="border-red-500/50 bg-red-500/10">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-red-500">
-                    Wallet Error
-                  </p>
-                  <p className="text-xs text-muted-foreground">{walletError}</p>
-                  <Button
-                    variant="link"
-                    onClick={() => setWalletError(null)}
-                    className="text-xs text-red-500 hover:text-red-400 h-auto p-0 mt-1"
-                  >
-                    Dismiss
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!connected && !walletError && (
-          <Card className="border-yellow-500/50 bg-yellow-500/10">
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
-                <Wallet className="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-yellow-500">
-                    Wallet Not Connected
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Connect your wallet using the button in the header to mint
-                    your artwork
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <Button
           className="w-full h-12 text-lg font-bold tracking-wider uppercase"
-          disabled={!connected || Object.keys(pixels).length === 0}
-          onClick={handlePreviewAndMint}
+          disabled={Object.keys(pixels).length === 0}
+          onClick={handlePreviewAndUpload}
         >
-          {!connected ? "Connect Wallet to Mint" : "Preview & Mint"}
+          Preview & Upload
         </Button>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type {
   UploadImageRequest,
   UploadImageResponse,
-} from "@/types/minting";
+} from "@/types/upload";
 import { uploadToTurbo } from "@/lib/turbo";
 
 /**

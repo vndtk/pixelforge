@@ -1,4 +1,4 @@
-# PixelForge Devnet Testing Guide
+# Mintistry Testing Guide
 
 This guide will help you test the complete NFT minting flow on Solana devnet.
 

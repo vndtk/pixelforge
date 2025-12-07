@@ -1,50 +1,6 @@
 /**
- * Types for NFT minting requests and responses
+ * Types for Arweave upload requests and responses
  */
-
-/**
- * Payload sent to backend minting API
- */
-export interface MintNFTRequest {
-  // NFT Metadata
-  name: string; // Max 32 characters
-  symbol?: string; // Default: "FORGE"
-  creatorMessage?: string; // Max 80 characters
-
-  // Canvas data
-  imageBase64: string; // Base64-encoded PNG (data URL format)
-  canvasSize: number; // Grid size (e.g., 32 for 32x32)
-  pixelData: Record<string, string>; // Raw pixel data for on-chain storage
-
-  // Wallet & signing
-  walletAddress: string; // User's wallet public key
-  signature?: string; // Optional: signature for verification
-
-  // Network
-  network?: "devnet" | "mainnet-beta";
-}
-
-/**
- * Response from backend minting API
- */
-export interface MintNFTResponse {
-  success: boolean;
-  transactionSignature?: string;
-  mintAddress?: string; // NFT mint address
-  metadataUri?: string; // URI to uploaded metadata
-  imageUri?: string; // URI to uploaded image
-  error?: string;
-  message?: string;
-}
-
-/**
- * Data prepared for minting (before sending to backend)
- */
-export interface PreparedMintData {
-  request: MintNFTRequest;
-  isValid: boolean;
-  validationErrors: string[];
-}
 
 /**
  * Request to upload image to Arweave
@@ -70,7 +26,7 @@ export interface UploadImageResponse {
  */
 export interface UploadMetadataRequest {
   name: string; // NFT name
-  symbol: string; // NFT symbol (e.g., "FORGE")
+  symbol: string; // NFT symbol (e.g., "MINTISTRY")
   description?: string; // NFT description
   imageUrl: string; // URL to the uploaded image on Arweave
   attributes?: Array<{ trait_type: string; value: string | number }>; // NFT attributes
